@@ -16,25 +16,26 @@ npm i --save @dumbjs/search
 **Initialize a Collection Model**
 
 ```js
-import {SearchCollection} from "@dumbjs/search"
+import { SearchCollection } from "@dumbjs/search";
+import { RedisAdapter } from "@dumbjs/search/adapters/redis";
 
-const collection = new SearchCollection("UserSearch", {
+const collection = new SearchCollection({
+  adapter: new RedisAdapter("UserSearch", {
     redis: client,
     name: "user-search",
-  });
+  }),
+});
 
-  // add in the required strings with the search terms string 
+// add in the required strings with the search terms string
 
-await collection. set(1,"Foo")
-await collection. set(2,"Foo Bar")
-await collection. set(3,"Foo Bar Baz")
+await collection.set(1, "Foo");
+await collection.set(2, "Foo Bar");
+await collection.set(3, "Foo Bar Baz");
 
-const result = await collection.search("Bar") //=> [2,3]
-
+const result = await collection.search("Bar"); //=> [2,3]
 ```
 
+## Credits
 
-## Credits 
-
-- [tj/reds](https://github.com/tj/reds) for the original implementation 
+- [tj/reds](https://github.com/tj/reds) for the original implementation
 - [antirez](http://oldblog.antirez.com/post/autocomplete-with-redis.html) for the more string prefix based solution

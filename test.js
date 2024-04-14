@@ -1,30 +1,44 @@
 import Redis from "ioredis";
-import { MODES, SearchCollection } from "./src/SearchCollection";
-import {test} from "node:test"
+import { SearchCollection } from "./src/SearchCollection";
+import { RedisAdapter, MODES } from "./src/adapters/redis";
+import { test } from "node:test";
 import assert from "assert/strict";
 
-const client = new Redis();
+await test("Redis", async (t) => {
+  let client;
+  
+  t.before(async () => {
+    client = new Redis();
+    if (client.status === "connecting") return;
+  });
 
-test("basic",async()=>{
-  const collection = new SearchCollection("UserSearch", {
-    redis: client,
-    mode: MODES.phonetic,
-    name: "user-search",
+  t.after(async () => {
+    await client.disconnect();
   });
-  
-  await collection.set(1, "hello");
-  await collection.set(2, "what's up");
-  await collection.set(3, "foo bar");
-  
-  const result = await collection.search("foo bar", {
-    type: "and",
-    between: {
-      from: 0,
-      to: -1,
-    },
+
+  await t.test("basic", async () => {
+    const collection = new SearchCollection({
+      adapter: new RedisAdapter("UserSearch", {
+        mode: MODES.phonetic,
+        client: client,
+      }),
+    });
+
+    await collection.set(1, "hello");
+    await collection.set(2, "what's up");
+    await collection.set(3, "foo bar");
+
+    const result = await collection.search("foo bar", {
+      type: "and",
+      between: {
+        from: 0,
+        to: -1,
+      },
+    });
+
+    assert.deepEqual(
+      result.map((x) => Number(x)),
+      [3]
+    );
   });
-  
-  await client.disconnect()
-  
-  assert.deepEqual(result.map(x=>Number(x)),[3])
-})
+});

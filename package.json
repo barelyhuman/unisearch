@@ -13,6 +13,16 @@
         "types": "./dist/commonjs/index.d.ts",
         "default": "./dist/commonjs/index.js"
       }
+    },
+    "./redis": {
+      "import": {
+        "types": "./dist/esm/adapters/redis.d.ts",
+        "default": "./dist/esm/adapters/redis.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/adapters/redis.d.ts",
+        "default": "./dist/commonjs/adapters/redis.js"
+      }
     }
   },
   "main": "./dist/commonjs/index.js",
@@ -40,7 +50,8 @@
   "packageManager": "pnpm@8.15.7",
   "tshy": {
     "exports": {
-      ".": "./src/index.ts"
+      ".": "./src/index.ts",
+      "./redis": "./src/adapters/redis.ts"
     }
   }
 }
