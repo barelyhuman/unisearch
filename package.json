@@ -1,0 +1,46 @@
+{
+  "name": "@dumbjs/search",
+  "version": "0.0.0",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/commonjs/index.d.ts",
+        "default": "./dist/commonjs/index.js"
+      }
+    }
+  },
+  "main": "./dist/commonjs/index.js",
+  "types": "./dist/commonjs/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepare": "tshy",
+    "test": "tsx test.js"
+  },
+  "dependencies": {
+    "leven": "^4.0.0",
+    "natural": "^7.0.0"
+  },
+  "devDependencies": {
+    "ioredis": "^5.3.2",
+    "tshy": "^1.13.1",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
+  },
+  "peerDependencies": {
+    "ioredis": "^5.3.2"
+  },
+  "packageManager": "pnpm@8.15.7",
+  "tshy": {
+    "exports": {
+      ".": "./src/index.ts"
+    }
+  }
+}
