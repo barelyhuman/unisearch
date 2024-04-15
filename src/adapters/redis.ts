@@ -13,6 +13,11 @@ const types = {
   or: "zunionstore",
 };
 
+type ProcessTokens = {
+  tokens: string[][];
+  keys: string[];
+};
+
 type ProcessLanguage = {
   words: string[];
   counts: Record<string, number>;
@@ -31,6 +36,7 @@ export type SearchOptions = {
 
 export enum MODES {
   phonetic,
+  prefix,
 }
 
 export type Options = {
@@ -46,12 +52,25 @@ export class RedisAdapter implements Adapter<SearchOptions, SearchResult> {
   mode: MODES;
   constructor(name: string, options: Options) {
     this.redis = options.client;
-    this.mode = options.mode;
+    this.mode = options.mode || MODES.phonetic;
     this.index = name;
   }
   async set(id: string | number, text: string) {
+    if (this.mode === MODES.prefix) {
+      return this.#setTypeAhead(id, text);
+    }
+    return this.#setMetaphone(id, text);
+  }
+
+  async #setTypeAhead(id: string | number, text: string) {
+    const processed = processText(id, text);
+    await writeToTypeAheadIndex(this.redis, this.index, id, processed);
+    return true;
+  }
+
+  async #setMetaphone(id: string | number, text: string) {
     const processed = processLanguage(text, id);
-    await writeToIndex(this.redis, this.index, id, processed);
+    await writeToMetaphoneIndex(this.redis, this.index, id, processed);
     return true;
   }
 
@@ -61,10 +80,14 @@ export class RedisAdapter implements Adapter<SearchOptions, SearchResult> {
   }
 
   async search(text: string, options?: SearchOptions) {
-    if (this.mode != MODES.phonetic) {
-      throw new Error("We only support phonetic search right now");
+    if (this.mode === MODES.prefix) {
+      return this.#typeaheadSearch(text, options);
     }
 
+    return this.#metaphoneSearch(text, options);
+  }
+
+  async #metaphoneSearch(text: string, options?: SearchOptions) {
     const nlpObj = processLanguage(text, this.index);
     const keys = nlpObj.metaphoneKeys;
     const _type = options?.type ? types[options.type] : null;
@@ -88,6 +111,55 @@ export class RedisAdapter implements Adapter<SearchOptions, SearchResult> {
 
     return result[1][1] as SearchResult;
   }
+
+  async #typeaheadSearch(text: string, options?: SearchOptions) {
+    const words = getWords(text);
+    const _type = options?.type ? types[options.type] : null;
+    const type = _type ?? types["and"];
+    const start = options?.between?.from ?? 0;
+    const stop = options?.between?.to ?? -1;
+    const keys = words.sort((x, y) =>
+      x.toLocaleLowerCase().localeCompare(y.toLocaleLowerCase())
+    );
+
+    const base = await this.redis
+      .multi();
+    let tkey;
+    if (keys.length >= 1) {
+      if (type === types.and) {
+        tkey = this.index + ":cache:" + keys.join("&");
+
+        base.zinterstore(
+          tkey,
+          keys.length,
+          keys.map((d) => this.index + `:token:${d}`),
+        );
+      } else if (type === types.or) {
+        tkey = this.index + ":cache:" + keys.join("|");
+        base.zunionstore(
+          tkey,
+          keys.length,
+          keys.map((d) => this.index + `:token:${d}`),
+        );
+      }
+    } else {
+      tkey = this.index + ":token:" + keys.join("");
+    }
+    await base.exec();
+
+    const result = await this.redis.zrange(tkey, start, stop);
+
+    return result;
+  }
+}
+
+function processText(id: string | number, str: string) {
+  const tokens = getTextTokens(str);
+  const keys = getTokenKeys(id, tokens);
+  return {
+    tokens,
+    keys,
+  };
 }
 
 function processLanguage(str: string, id: string | number) {
@@ -106,7 +178,20 @@ function processLanguage(str: string, id: string | number) {
   };
 }
 
-async function writeToIndex(
+async function writeToTypeAheadIndex(
+  client: Redis,
+  index: string,
+  id: number | string,
+  tokenObj: ProcessTokens,
+) {
+  const cmds: any[] = [];
+  tokenObj.keys.forEach(function (key: string, i) {
+    cmds.push(["zadd", index + ":token:" + key, 0, id]);
+  });
+  await client.multi(cmds).exec();
+}
+
+async function writeToMetaphoneIndex(
   client: Redis,
   index: string,
   id: number | string,
@@ -195,4 +280,27 @@ function toMetaphoneArray(words: string[]) {
 function getMetaphoneKeys(id: string | number, words: string[]) {
   return toMetaphoneArray(words)
     .map((c) => id + ":word:" + c);
+}
+
+function getTextTokens(text: string) {
+  const words = getWords(text);
+  return words.map((d) => {
+    const tokens = d.split("").map((c, i) => {
+      return d.slice(0, i + 1);
+    });
+    tokens[tokens.length - 1] = tokens[tokens.length - 1];
+    return tokens;
+  });
+}
+
+function getTokenKeys(id: string | number, tokens: string[][]) {
+  const keys = [];
+  for (let i in tokens) {
+    const wordSet = tokens[i];
+    for (let j in wordSet) {
+      const typeToken = wordSet[j];
+      keys.push(`${typeToken}`);
+    }
+  }
+  return keys;
 }
