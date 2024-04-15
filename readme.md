@@ -17,7 +17,7 @@ npm i --save @dumbjs/search
 
 ```js
 import { SearchCollection } from "@dumbjs/search";
-import { RedisAdapter } from "@dumbjs/search/adapters/redis";
+import { RedisAdapter } from "@dumbjs/search/redis";
 
 const collection = new SearchCollection({
   adapter: new RedisAdapter("UserSearch", {
