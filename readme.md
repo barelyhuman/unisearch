@@ -3,7 +3,7 @@
 > Unified Search Adaptor Model for various databases.
 
 > [!NOTE]
-> The library is still being developed, please only use it for beta testing and not on a productino project.
+> The library is still being developed, please only use it for beta testing and not on a production project.
 
 ## Usage
 
